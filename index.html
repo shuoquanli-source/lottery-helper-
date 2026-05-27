@@ -103,6 +103,7 @@ h1{text-align:center;font-size:20px;padding:14px 0 4px;background:linear-gradien
     <div id="query-result"></div>
   </div>
   <div id="panel2" class="panel">
+    <div class="input-section" id="rec-filter"></div>
     <div style="text-align:center;margin-bottom:12px;">
       <button class="btn btn-primary" onclick="generateRecommendation()" style="max-width:280px;margin:auto;">🎯 生成20组推荐号码</button>
     </div>
@@ -169,7 +170,7 @@ function switchLottery(type){
   document.getElementById('btn-ssq').className=type==='ssq'?'active-ssq':'';
   document.getElementById('btn-dlt').className=type==='dlt'?'active-dlt':'';
   document.getElementById('btn-kl8').className=type==='kl8'?'active-kl8':'';
-  renderDrawList();renderQueryInput();
+  renderDrawList();renderQueryInput();renderRecFilter();
   document.getElementById('query-result').innerHTML='';
   document.getElementById('rec-list').innerHTML='';
 }
@@ -177,6 +178,7 @@ function switchTab(idx){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.className=i===idx?'tab-btn active':'tab-btn');
   document.querySelectorAll('.panel').forEach((p,i)=>p.className=i===idx?'panel active':'panel');
   if(idx===1)renderQueryInput();
+  if(idx===2)renderRecFilter();
 }
 function getData(){return currentLottery==='ssq'?ssqData:currentLottery==='dlt'?dltData:kl8Data}
 
@@ -359,10 +361,42 @@ function getSSQLevel(r,b){if(r===6&&b===1)return 1;if(r===6)return 2;if(r===5&&b
 function getDLTLevel(r,b){if(r===5&&b===2)return 1;if(r===5&&b===1)return 2;if(r===5)return 3;if(r===4&&b===2)return 4;if(r===4&&b===1)return 5;if(r===3&&b===2)return 6;if(r===4||r===3&&b===1||r===2&&b===2)return 7;if(r===3||r===2&&b===1||r===1&&b===2||b===2)return 8;if(r===2||r===1&&b===1||b===1)return 9;return 0}
 
 // ===== 功能3：号码推荐 =====
+function renderRecFilter(){
+  const isSSQ=currentLottery==='ssq',isDLT=currentLottery==='dlt',isKL8=currentLottery==='kl8';
+  const el=document.getElementById('rec-filter');
+  if(isKL8){
+    let html='<h3>🎯 一等奖重合筛选</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    html+='<span style="font-size:12px;color:#8899aa">重合个数:</span>';
+    html+='<select id="rec-kl8-hit" style="background:#0a0e17;color:#e0e6ed;border:2px solid #1e2a3a;border-radius:8px;padding:6px 10px;font-size:13px"><option value="-1">不限</option>';
+    for(let i=0;i<=10;i++)html+=`<option value="${i}">${i}个</option>`;
+    html+='</select></div>';
+    el.innerHTML=html;
+  }else{
+    const redCount=isSSQ?6:5;
+    let html='<h3>🎯 一等奖重合筛选</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    html+='<span style="font-size:12px;color:#8899aa">红球重合:</span>';
+    html+='<select id="rec-red-hit" style="background:#0a0e17;color:#e0e6ed;border:2px solid #1e2a3a;border-radius:8px;padding:6px 10px;font-size:13px"><option value="-1">不限</option>';
+    for(let i=0;i<=redCount;i++)html+=`<option value="${i}">${i}个</option>`;
+    html+='</select>';
+    html+='<span style="font-size:12px;color:#8899aa;margin-left:6px">蓝球重合:</span>';
+    const blueCount=isSSQ?1:2;
+    html+='<select id="rec-blue-hit" style="background:#0a0e17;color:#e0e6ed;border:2px solid #1e2a3a;border-radius:8px;padding:6px 10px;font-size:13px"><option value="-1">不限</option>';
+    for(let i=0;i<=blueCount;i++)html+=`<option value="${i}">${i}个</option>`;
+    html+='</select></div>';
+    el.innerHTML=html;
+  }
+}
+
 function generateRecommendation(){
   const data=getData(),isSSQ=currentLottery==='ssq',isDLT=currentLottery==='dlt',isKL8=currentLottery==='kl8';
+  renderRecFilter();
   
   if(isKL8){generateKL8Rec(data);return}
+  
+  const filterRedEl=document.getElementById('rec-red-hit');
+  const filterBlueEl=document.getElementById('rec-blue-hit');
+  const filterRed=filterRedEl?parseInt(filterRedEl.value):-1;
+  const filterBlue=filterBlueEl?parseInt(filterBlueEl.value):-1;
   
   const redMax=isSSQ?33:35,blueMax=isSSQ?16:12,redCount=isSSQ?6:5,blueCount=isSSQ?1:2;
   const histP1=new Set(),histP2=new Set();
@@ -381,15 +415,30 @@ function generateRecommendation(){
   function wr(w,m){const e=[];for(let i=1;i<=m;i++)e.push([i,w[i]]);const s=e.reduce((a,x)=>a+x[1],0);let r=Math.random()*s;for(const[v,w2]of e){r-=w2;if(r<=0)return v}return m}
   function gen1(){const r=new Set();while(r.size<redCount)r.add(wr(rw,redMax));const b=new Set();while(b.size<blueCount)b.add(wr(bw,blueMax));return{reds:[...r].sort((a,b)=>a-b),blues:[...b].sort((a,b)=>a-b)}}
   const histP1Draws=data.filter(d=>parseInt(String(d.p1count).replace(/,/g,''))>0);
-  
+  function matchFilter(c){
+    if(filterRed===-1&&filterBlue===-1)return true;
+    for(const d of histP1Draws){
+      const matchRed=c.reds.filter(v=>d.reds.includes(v)).length;
+      const matchBlue=isSSQ?(c.blues[0]===d.blue?1:0):c.blues.filter(b=>d.blues.includes(b)).length;
+      const redOk=filterRed===-1||matchRed===filterRed;
+      const blueOk=filterBlue===-1||matchBlue===filterBlue;
+      if(redOk&&blueOk)return true;
+    }
+    return false;
+  }
   const recs=[],seen=new Set();let att=0;
-  while(recs.length<20&&att<2000){att++;const c=gen1();const fk=c.reds.join(',')+'|'+c.blues.join(',');
+  while(recs.length<20&&att<5000){att++;const c=gen1();const fk=c.reds.join(',')+'|'+c.blues.join(',');
     if(histP1.has(fk))continue;if(isSSQ&&histP2.has(c.reds.join(',')))continue;
     if(!isSSQ&&(histP2.has(c.reds.join(',')+'|'+c.blues[0])||histP2.has(c.reds.join(',')+'|'+c.blues[1])))continue;
-    if(seen.has(fk))continue;seen.add(fk);recs.push(c)}
+    if(seen.has(fk))continue;
+    if(!matchFilter(c))continue;
+    seen.add(fk);recs.push(c)}
   
   const box=document.getElementById('rec-list');
-  let html=`<div class="result-title">🎯 冷门加权推荐（${recs.length}组，排除历史一二等奖号码）</div>`;
+  let filterDesc='';
+  if(filterRed!==-1||filterBlue!==-1)filterDesc=`（筛选: 红${filterRed===-1?'不限':filterRed+'个'}+${isSSQ?'蓝':'后区'}${filterBlue===-1?'不限':filterBlue+'个'}重合）`;
+  let html=`<div class="result-title">🎯 冷门加权推荐（${recs.length}组，排除历史一二等奖号码）${filterDesc}</div>`;
+  if(!recs.length){html+='<div class="empty">筛选条件太严格，未找到符合的推荐号码，试试放宽条件</div>';box.innerHTML=html;return}
   for(let i=0;i<recs.length;i++){
     const r=recs[i];
     let maxP1Hit=0,bestP1Draw=null,bestP1MatchReds=[],bestP1MatchBlue=false;
@@ -436,17 +485,32 @@ function generateKL8Rec(data){
   function wr(w,m){const e=[];for(let i=1;i<=m;i++)e.push([i,w[i]]);const s=e.reduce((a,x)=>a+x[1],0);let r=Math.random()*s;for(const[v,w2]of e){r-=w2;if(r<=0)return v}return m}
   function gen1(){const r=new Set();while(r.size<10)r.add(wr(weights,80));return[...r].sort((a,b)=>a-b)}
   
+  const filterKL8El=document.getElementById('rec-kl8-hit');
+  const filterKL8=filterKL8El?parseInt(filterKL8El.value):-1;
+  function matchKL8Filter(c){
+    if(filterKL8===-1)return true;
+    for(const d of data){
+      const hitCount=c.filter(n=>d.nums.includes(n)).length;
+      if(hitCount===filterKL8)return true;
+    }
+    return false;
+  }
+  
   const recs=[],seen=new Set();let att=0;
-  while(recs.length<20&&att<3000){att++;const c=gen1();const fk=c.join(',');
+  while(recs.length<20&&att<5000){att++;const c=gen1();const fk=c.join(',');
     let allHit=false;
     for(const d of data){
       if(c.every(n=>d.nums.includes(n))){allHit=true;break}
     }
-    if(allHit)continue;if(seen.has(fk))continue;seen.add(fk);recs.push(c)}
+    if(allHit)continue;if(seen.has(fk))continue;
+    if(!matchKL8Filter(c))continue;
+    seen.add(fk);recs.push(c)}
   
   const histP1Draws=data;
   const box=document.getElementById('rec-list');
-  let html=`<div class="result-title">🎯 快乐8选十推荐（${recs.length}组，排除历史选十全中号码）</div>`;
+  let filterDesc=filterKL8!==-1?`（筛选: 重合${filterKL8}个）`:'';
+  let html=`<div class="result-title">🎯 快乐8选十推荐（${recs.length}组，排除历史选十全中号码）${filterDesc}</div>`;
+  if(!recs.length){html+='<div class="empty">筛选条件太严格，未找到符合的推荐号码，试试放宽条件</div>';box.innerHTML=html;return}
   for(let i=0;i<recs.length;i++){
     const r=recs[i];
     let maxHit=0,bestDraw=null,bestHitNums=[];
@@ -479,7 +543,7 @@ function copyNum(s){navigator.clipboard.writeText(s).then(()=>{const btn=event.t
 function p2(n){return n<10?'0'+n:''+n}
 function formatMoney(s){const n=parseInt(String(s).replace(/,/g,''));if(isNaN(n))return s;if(n>=1e8)return(n/1e8).toFixed(2)+'亿';if(n>=1e4)return(n/1e4).toFixed(0)+'万';return n.toLocaleString()}
 
-loadData();renderQueryInput();
+loadData();renderQueryInput();renderRecFilter();
 </script>
 </body>
 </html>
