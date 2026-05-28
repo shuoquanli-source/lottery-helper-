@@ -110,7 +110,7 @@ h1{text-align:center;font-size:20px;padding:14px 0 4px;background:linear-gradien
 var ssqData=[],dltData=[],kl8Data=[];
 var currentLottery='ssq';
 var savedFilterRed=-1,savedFilterBlue=-1,savedFilterKL8=-1;
-var DATA_BASE='/lottery-helper-/data';
+var DATA_BASE=location.hostname==='shuoquanli-source.github.io'?'/lottery-helper-/data':'./data';
 
 function loadData(){
   document.getElementById('draw-list').innerHTML='<div class="loading">⏳ 加载数据中...</div>';
